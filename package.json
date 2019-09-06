@@ -1,0 +1,22 @@
+{
+  "name": "graphql-server",
+  "version": "1.0.0",
+  "description": "A GraphQL Server + Express App build upon Node JS",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "GraphQL",
+    "Express",
+    "Firestore"
+  ],
+  "author": "Chaitanya",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^4.17.1",
+    "express-graphql": "^0.9.0",
+    "firestore": "^1.1.6",
+    "graphql": "^14.5.4"
+  }
+}
