@@ -6,18 +6,7 @@ let firebase = require('../firebase.config'),
     booksReference = firestore.collection('books'),
     authorsReference = firestore.collection('authors');
 
-const books = [
-                {id: '1', name: 'Book One', genre: 'genre One', authorId: '1'},
-                {id: '2', name: 'Book Two', genre: 'genre Two', authorId: '2'},
-                {id: '3', name: 'Book Three', genre: 'genre Three', authorId: '3'},
-                {id: '4', name: 'Book Four', genre: 'genre Four', authorId: '1'}
-            ];
-
-const authors = [
-                    {id: '1', name: 'Author One', age: 21},
-                    {id: '2', name: 'Author Two', age: 22},
-                    {id: '3', name: 'Author Three', age: 23},
-]
+const getAuthorById = (id) => authorsReference.doc(id).get().then(doc => doc.data());
 
 const BookType = new GraphQLObjectType({
     name: 'Book',
@@ -28,7 +17,7 @@ const BookType = new GraphQLObjectType({
         author: {
             type: AuthorType,
             resolve: (parent, args) => {
-                return authors.find(author => author.id === parent.authorId)
+                return getAuthorById(parent.authorId)
             }}
     })
 })
@@ -41,8 +30,8 @@ const AuthorType = new GraphQLObjectType({
         age: {type: GraphQLInt},
         books: {
             type: new GraphQLList(BookType),
-            resolve: (parent, args) => {
-                return books.filter(book => book.authorId === parent.id)
+            resolve: (parent) => {
+                return booksReference.get().then(query => query.docs.map(doc => doc.data()).filter(doc => doc.authorId === parent.id));
             }
         }
     })
@@ -55,26 +44,28 @@ const RootQuery = new GraphQLObjectType({
             type: BookType,
             args: {id : {type: GraphQLID}},
             resolve: (parent, args) => {
-                return books.find(book => args.id === book.id);
+                return booksReference.doc(args.id).get().then(doc => doc.data());
             }
         },
         author: {
             type: AuthorType,
             args: {id : {type: GraphQLID}},
             resolve: (parent, args) => {
-                return authors.find(book => args.id === book.id);
+                return getAuthorById(args.id);
             }
         },
         books: {
             type: new GraphQLList(BookType),
             resolve: () => {
-                
+                // booksReference.get().then(query => query.docs.forEach(doc => console.log(doc.data())));
+               // booksReference.doc('2x6b7lSOKCHADaP2MMD8').get().then(doc => console.log(doc.data()));
+                return booksReference.get().then(query => query.docs.map(doc => doc.data()));
             }
         },
         authors: {
             type: new GraphQLList(AuthorType),
             resolve: () => {
-                return authors;
+                return authorsReference.get().then(query => query.docs.map(doc => doc.data()));
             }
         }
     }
@@ -92,16 +83,38 @@ const Mutation = new GraphQLObjectType({
                 authorId: {type: new GraphQLNonNull(GraphQLString)}
             },
             resolve : (parent, args) => {
-                return booksReference.add({
+                return booksReference.doc(args.id).set({
                     id : args.id,
                     name: args.name,
                     genre: args.genre,
                     authorId: args.authorId
-                })
+                }).then(() => authorsReference.doc(args.authorId).update({
+                    bookIds : firebase.firestore.FieldValue.arrayUnion(args.id)
+                }))
+                  .then(() => booksReference.doc(args.id).get())
+                  .then(doc => doc.data())
+            }
+        },
+        addAuthor: {
+            type: AuthorType,
+            args: {
+                id: {type: new GraphQLNonNull(GraphQLID),},
+                name: {type: new GraphQLNonNull(GraphQLString)},
+                age: {type: new GraphQLNonNull(GraphQLInt)},
+            },
+            resolve : (parent, args) => {
+                return authorsReference.doc(args.id).set({
+                    id : args.id,
+                    name: args.name,
+                    age: args.age,
+                    bookIds: []
+                }).then(() => authorsReference.doc(args.id).get())
+                  .then(doc => doc.data())
             }
         }
     }
 })
+
 module.exports = new GraphQLSchema({
     query: RootQuery,
     mutation: Mutation
